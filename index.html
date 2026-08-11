@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Media Visualizer by RTZ</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    /* #scene covers the entire viewport and is where sphere clicks are
+       handled in JS — it must NOT be a drag region, or Chromium intercepts
+       mousedown to move the window natively and the click never reaches
+       our listener at all. A small dedicated strip below is the drag
+       handle instead (frameless window — see electron/main.cjs). */
+    #scene { position: fixed; inset: 0; -webkit-app-region: no-drag; }
+    canvas { display: block; }
+
+    #drag-handle {
+      position: fixed; top: 0; left: 0; right: 32px; height: 22px; z-index: 5;
+      -webkit-app-region: drag;
+    }
+
+    #close-btn {
+      position: fixed; top: 8px; right: 8px; z-index: 20;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(20, 10, 14, 0.5); color: #fff; border: none;
+      font: 14px/1 system-ui, sans-serif; cursor: pointer;
+      opacity: 0.5; transition: opacity 0.2s ease, background 0.2s ease;
+      -webkit-app-region: no-drag;
+    }
+    #close-btn:hover { opacity: 1; background: rgba(255, 43, 68, 0.75); }
+
+    /* Echoes the sphere's look: same pink dots, but with no defined edge —
+       the dot field itself thins out and dims into the dark, standing in
+       for a border instead of a drawn line. Sizes use clamp() so the whole
+       box scales down smoothly as the window shrinks, not just its max-width. */
+    #now-playing {
+      position: fixed; bottom: clamp(14px, 3vw, 28px); left: 50%; transform: translateX(-50%);
+      z-index: 10; max-width: 70vw;
+      display: flex; align-items: center; gap: clamp(6px, 1.4vw, 14px);
+      font: clamp(11px, 1.3vw, 13px)/1.4 system-ui, sans-serif; color: #cfe8ff;
+      padding: clamp(8px, 1.6vw, 16px) clamp(14px, 2.6vw, 28px);
+      opacity: 0; transition: opacity 0.4s ease;
+      pointer-events: none;
+    }
+    #now-playing.visible { opacity: 1; }
+    #now-playing::before {
+      content: '';
+      position: absolute;
+      inset: clamp(-30px, -6vw, -60px); /* extends well past the text so the dots have room to fade out into space */
+      background-image: radial-gradient(circle, rgba(255, 43, 68, 0.75) 1px, transparent 1.4px);
+      background-size: 4px 4px;
+      -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
+      mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
+      pointer-events: none;
+      z-index: -1;
+    }
+    #np-text { text-align: center; min-width: 0; flex: 1; }
+    #np-title {
+      font-size: clamp(12px, 1.5vw, 14px); font-weight: 600; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #np-artist { font-size: clamp(10px, 1.2vw, 12px); color: #fff; margin-top: 2px; }
+    /* Ad mode: no artist line, so the title alone sits centered in the box
+       (the box's padding is symmetric top/bottom). */
+    #now-playing.ad #np-artist { display: none; }
+
+    .np-btn {
+      flex: none; width: clamp(20px, 2.6vw, 26px); height: clamp(20px, 2.6vw, 26px);
+      border-radius: 50%; border: none; cursor: pointer;
+      background: rgba(255, 43, 68, 0.18); color: #fff;
+      font: clamp(10px, 1.2vw, 12px)/1 system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: auto;
+      -webkit-app-region: no-drag;
+      transition: background 0.15s ease;
+    }
+    .np-btn:hover { background: rgba(255, 43, 68, 0.4); }
+  </style>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <div id="drag-handle"></div>
+  <button id="close-btn" aria-label="Close">&times;</button>
+
+  <div id="now-playing">
+    <button id="np-prev" class="np-btn" aria-label="Previous track">&#9664;</button>
+    <div id="np-text">
+      <div id="np-title"></div>
+      <div id="np-artist"></div>
+    </div>
+    <button id="np-next" class="np-btn" aria-label="Next track">&#9654;</button>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

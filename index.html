@@ -4,6 +4,21 @@
   <meta charset="UTF-8" />
   <title>Media Visualizer by RTZ</title>
   <style>
+    :root {
+      /* Preset colors, as R,G,B triplets (so they drop straight into
+         rgba()) — matches the COLOR_* palette in src/scene.js. Pick one
+         for --box-color-rgb below, or add your own. */
+      --color-red: 255, 43, 68;
+      --color-pink: 255, 102, 136;
+      --color-cyan: 102, 238, 255;
+      --color-purple: 170, 102, 255;
+      --color-green: 90, 255, 160;
+      --color-orange: 255, 157, 77;
+      --color-gold: 255, 209, 102;
+
+      --box-color-rgb: var(--color-purple); /* <- change to any --color-* preset above */
+    }
+
     html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
     /* #scene covers the entire viewport and is where sphere clicks are
        handled in JS — it must NOT be a drag region, or Chromium intercepts
@@ -47,7 +62,7 @@
       content: '';
       position: absolute;
       inset: clamp(-30px, -6vw, -60px); /* extends well past the text so the dots have room to fade out into space */
-      background-image: radial-gradient(circle, rgba(255, 43, 68, 0.75) 1px, transparent 1.4px);
+      background-image: radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
       background-size: 4px 4px;
       -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
       mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
@@ -67,14 +82,14 @@
     .np-btn {
       flex: none; width: clamp(20px, 2.6vw, 26px); height: clamp(20px, 2.6vw, 26px);
       border-radius: 50%; border: none; cursor: pointer;
-      background: rgba(255, 43, 68, 0.18); color: #fff;
+      background: rgba(var(--box-color-rgb), 0.18); color: #fff;
       font: clamp(10px, 1.2vw, 12px)/1 system-ui, sans-serif;
       display: flex; align-items: center; justify-content: center;
       pointer-events: auto;
       -webkit-app-region: no-drag;
       transition: background 0.15s ease;
     }
-    .np-btn:hover { background: rgba(255, 43, 68, 0.4); }
+    .np-btn:hover { background: rgba(var(--box-color-rgb), 0.4); }
   </style>
 </head>
 <body>

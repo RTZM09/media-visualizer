@@ -1,0 +1,12 @@
+# NOTE: Exec/Icon below are absolute paths tied to where this repo lives on
+# THIS machine. If you clone it somewhere else, update both paths to match,
+# then re-run: ln -sf "$(pwd)/media-visualizer.desktop" ~/.local/share/applications/
+[Desktop Entry]
+Type=Application
+Name=Media Visualizer
+Comment=Audio-reactive particle sphere visualizer
+Exec=/home/matei/Documents/proiecte_personale/player_spotify/launch.sh
+Icon=/home/matei/Documents/proiecte_personale/player_spotify/assets/icon.png
+Terminal=false
+Categories=AudioVideo;Music;
+StartupNotify=true

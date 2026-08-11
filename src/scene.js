@@ -13,6 +13,20 @@
 import * as THREE from 'three';
 
 // ============================================================================
+// PRESET COLORS — pick one of these for SPHERE_COLOR below (index.html has
+// a matching palette for the now-playing box's color — keep them in sync
+// by hand, since CSS can't read these JS values directly). Add your own
+// hex values here too if you want something outside this set.
+// ============================================================================
+const COLOR_RED = 0xff2b44;
+const COLOR_PINK = 0xff6688;
+const COLOR_CYAN = 0x66eeff;
+const COLOR_PURPLE = 0xaa66ff;
+const COLOR_GREEN = 0x5affa0;
+const COLOR_ORANGE = 0xff9d4d;
+const COLOR_GOLD = 0xffd166;
+
+// ============================================================================
 // TUNABLES — everything that changes how the sphere looks and behaves lives
 // here. The code below this section just reads these values; you shouldn't
 // need to touch anything past "IMPLEMENTATION" for a look/feel change.
@@ -21,9 +35,9 @@ import * as THREE from 'three';
 // --- Overall size & shape --------------------------------------------------
 const SPHERE_RADIUS = 1.6; // base radius of the sphere the points sit on
 const CAMERA_DISTANCE = 9; // how far back the camera sits — bigger number = sphere reads smaller on screen
-const POINT_COUNT = 3100; // how many dots make up the sphere
+const POINT_COUNT = 1800; // how many dots make up the sphere
 const BASE_POINT_SIZE = 0.035; // fixed size of each dot (world units) — does NOT react to audio
-const POINT_COLOR = 0xff6688; // single flat color used for every dot
+const SPHERE_COLOR = COLOR_PURPLE; // <- change to any COLOR_* preset above (or your own hex)
 const POINT_OPACITY = 0.9; // flat opacity for every dot
 // No background — the window itself is transparent (see electron/main.cjs)
 // so the sphere floats directly over the desktop.
@@ -319,7 +333,7 @@ export class Scene {
       uBeatNonBassFactor: { value: BEAT_NON_BASS_FACTOR },
       uTwinkleSpeed: { value: TWINKLE_SPEED },
       uTwinkleSizeAmount: { value: TWINKLE_SIZE_AMOUNT },
-      uColor: { value: new THREE.Color(POINT_COLOR) },
+      uColor: { value: new THREE.Color(SPHERE_COLOR) },
       uOpacity: { value: POINT_OPACITY },
     };
 

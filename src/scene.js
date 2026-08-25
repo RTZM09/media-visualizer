@@ -11,20 +11,11 @@
 // only radial distance reacts.
 
 import * as THREE from 'three';
+import { DEFAULT_KEY, hexFromKey, rgbTriplet } from './palette.js';
 
-// ============================================================================
-// PRESET COLORS — pick one of these for SPHERE_COLOR below (index.html has
-// a matching palette for the now-playing box's color — keep them in sync
-// by hand, since CSS can't read these JS values directly). Add your own
-// hex values here too if you want something outside this set.
-// ============================================================================
-const COLOR_RED = 0xff2b44;
-const COLOR_PINK = 0xff6688;
-const COLOR_CYAN = 0x66eeff;
-const COLOR_PURPLE = 0xaa66ff;
-const COLOR_GREEN = 0x5affa0;
-const COLOR_ORANGE = 0xff9d4d;
-const COLOR_GOLD = 0xffd166;
+// PRESET COLORS now live in src/palette.js — a single list shared by the
+// sphere and the now-playing box, switchable at runtime by pressing `s`
+// (see src/color-menu.js). Add new colors there, not here.
 
 // ============================================================================
 // TUNABLES — everything that changes how the sphere looks and behaves lives
@@ -37,7 +28,7 @@ const SPHERE_RADIUS = 1.6; // base radius of the sphere the points sit on
 const CAMERA_DISTANCE = 9; // how far back the camera sits — bigger number = sphere reads smaller on screen
 const POINT_COUNT = 1800; // how many dots make up the sphere
 const BASE_POINT_SIZE = 0.035; // fixed size of each dot (world units) — does NOT react to audio
-const SPHERE_COLOR = COLOR_PURPLE; // <- change to any COLOR_* preset above (or your own hex)
+const DEFAULT_SPHERE_COLOR = hexFromKey(DEFAULT_KEY); // starting color; setColor()/setRegionColors() take over at runtime
 const POINT_OPACITY = 0.9; // flat opacity for every dot
 // No background — the window itself is transparent (see electron/main.cjs)
 // so the sphere floats directly over the desktop.
@@ -46,6 +37,49 @@ const POINT_OPACITY = 0.9; // flat opacity for every dot
 // needs to reframe itself (e.g. the now-playing box appearing/disappearing
 // — see setVerticalTarget()). Lower = slower/smoother, higher = snappier.
 const VERTICAL_REPOSITION_SMOOTHING = 0.08;
+
+// --- Rainbow mode ----------------------------------------------------------
+// The last swatch in the `s` menu. Instead of one color for the whole sphere,
+// each region gets its own hue and the whole color field slowly rotates
+// across the surface, so the colors drift over the dots.
+//
+// The regions here are the SAME anchors that drive the audio displacement
+// (ZONE_ANCHORS), blended with the same weighted-falloff trick — so the color
+// patches line up with the bumps and have no hard seams.
+// Fully saturated on purpose: neighbouring regions blend at their borders,
+// and blending hues always costs saturation, so these start vivid to land in
+// the same register as the flat presets once blended.
+const REGION_SATURATION = 1.0;
+const REGION_LIGHTNESS = 0.58;
+// How long the color field takes to make one full turn around the sphere.
+const REGION_SPIN_SECONDS = 26;
+// Tilted off the Y axis on purpose: spinning about plain Y would leave the
+// sphere's poles nearly static, since a pole sits on the rotation axis.
+const REGION_SPIN_AXIS = new THREE.Vector3(0.35, 1, 0.18).normalize();
+// How tightly each region holds its own hue. Higher = more distinct patches,
+// lower = softer, more washed-together ones.
+//
+// Note this weights hues with exp(k * cos) rather than the pow(cos, k) the
+// displacement blend above uses. pow's kernel is only ~1/sqrt(k) wide, but the
+// anchors sit ~60 degrees apart, so out between them every weight is tiny AND
+// comparable — the normalized blend there becomes an unstable average of many
+// far-away hues, which reads as confetti rather than regions. exp() compares
+// anchors by the *difference* of their dots, so the nearest one leads by the
+// same margin wherever you sample, and a point midway between two regions
+// lands on a clean 50/50 of just those two.
+const REGION_SHARPNESS = 12;
+// How much the far side of the shell fades out in this mode, 0..1.
+//
+// The sphere is a transparent shell of dots with no depth write, so normally
+// you see the back hemisphere straight through the front. With one flat color
+// that just reads as depth, but with per-region hues it interleaves opposite
+// sides of the sphere dot-by-dot and the patches dissolve into confetti.
+// Fading the far side lets the regions facing you actually read as regions.
+// Scaled by uRegionMix, so flat presets keep the original see-through look.
+const REGION_BACK_FADE = 0.7;
+// How quickly the sphere crossfades between a flat color and the region
+// field when you switch modes (higher = snappier).
+const REGION_FADE_SMOOTHING = 0.06;
 
 // --- Regions -----------------------------------------------------------
 const ANCHOR_COUNT = 12; // how many independent regions the sphere is split into
@@ -156,6 +190,17 @@ const ANCHOR_ZONE = shuffled([
   ...Array(ANCHORS_PER_CHARACTERISTIC.treble).fill(ZONE_TREBLE),
 ]);
 
+// One hue per region, spread evenly around the color wheel and handed out in
+// anchor order. Since the anchors themselves are scattered randomly, that
+// puts contrasting hues next to each other rather than a smooth gradient —
+// which is what makes the patches read as distinct colors.
+const REGION_COLORS = ZONE_ANCHORS.map((_, i) =>
+  new THREE.Color().setHSL(i / ANCHOR_COUNT, REGION_SATURATION, REGION_LIGHTNESS)
+);
+// Flattened for the shader — a plain Float32Array is unambiguous for a vec3[]
+// uniform, where an array of objects depends on three's flattening.
+const REGION_COLORS_FLAT = new Float32Array(REGION_COLORS.flatMap((c) => [c.r, c.g, c.b]));
+
 function smoothTowards(current, target, attackRate, releaseRate) {
   return THREE.MathUtils.lerp(current, target, target > current ? attackRate : releaseRate);
 }
@@ -183,6 +228,27 @@ const POINT_VERTEX_SHADER = /* glsl */ `
   uniform float uTwinkleSpeed;
   uniform float uTwinkleSizeAmount;
 
+  // Rainbow mode (see REGION_* above). uRegionMix crossfades between the flat
+  // uColor and the rotating per-region field, so switching modes eases rather
+  // than snapping.
+  uniform vec3 uColor;
+  uniform vec3 uAnchorColors[${ANCHOR_COUNT}];
+  uniform vec3 uRegionAxis;
+  uniform float uRegionSpin;
+  uniform float uRegionMix;
+  uniform float uRegionSharpness;
+  uniform float uRegionBackFade;
+
+  varying vec3 vColor;
+  varying float vFade;
+
+  // Rodrigues' rotation: turns v about axis by angle.
+  vec3 rotateAboutAxis(vec3 v, vec3 axis, float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);
+  }
+
   void main() {
     vec3 dir = normalize(position);
 
@@ -206,7 +272,31 @@ const POINT_VERTEX_SHADER = /* glsl */ `
 
     vec3 displaced = position + dir * blended;
 
+    // Color. The same weighted blend as above, but over hues instead of
+    // displacement, and against anchors rotated by uRegionSpin — that spin is
+    // what carries the colors around the sphere, independently of the sphere's
+    // own rotation, so they drift across the dots instead of riding along.
+    vColor = uColor;
+    if (uRegionMix > 0.0) {
+      vec3 regionColor = vec3(0.0);
+      float regionWeight = 0.0;
+      for (int i = 0; i < ${ANCHOR_COUNT}; i++) {
+        vec3 spun = rotateAboutAxis(uAnchors[i], uRegionAxis, uRegionSpin);
+        // -1.0 keeps the exponent <= 0; the constant factor it introduces
+        // cancels out when the weights are normalized below.
+        float w = exp(uRegionSharpness * (dot(dir, spun) - 1.0));
+        regionColor += w * uAnchorColors[i];
+        regionWeight += w;
+      }
+      vColor = mix(uColor, regionColor / max(regionWeight, 0.0001), uRegionMix);
+    }
+
     vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
+
+    // Fade the hemisphere pointing away from the camera (region mode only).
+    vec3 normalView = normalize((modelViewMatrix * vec4(dir, 0.0)).xyz);
+    float facing = dot(normalView, normalize(-mvPosition.xyz));
+    vFade = mix(1.0, smoothstep(-0.45, 0.05, facing), uRegionMix * uRegionBackFade);
     float twinkle = 0.5 + 0.5 * sin(uTime * uTwinkleSpeed + aSeed * 6.2831);
     float size = uBaseSize + twinkle * uTwinkleSizeAmount;
     gl_PointSize = size * (uSizeScale / -mvPosition.z);
@@ -219,11 +309,12 @@ const POINT_VERTEX_SHADER = /* glsl */ `
 const POINT_FRAGMENT_SHADER = /* glsl */ `
   precision mediump float;
 
-  uniform vec3 uColor;
   uniform float uOpacity;
+  varying vec3 vColor;
+  varying float vFade;
 
   void main() {
-    gl_FragColor = vec4(uColor, uOpacity);
+    gl_FragColor = vec4(vColor, uOpacity * vFade);
   }
 `;
 
@@ -270,6 +361,12 @@ export class Scene {
     this._smoothMid = 0;
     this._smoothTreble = 0;
     this._currentScale = 1;
+    // Rainbow mode: _regionMix is what's on screen, _regionTarget is where it's
+    // heading (1 in rainbow mode, 0 on a flat color) — update() eases between
+    // them. _regionSpin is the color field's current rotation.
+    this._regionMix = 0;
+    this._regionTarget = 0;
+    this._regionSpin = 0;
 
     // Separate, slower-smoothed values feeding only the points' target
     // displacement (uBass/uMid/uTreble) — decoupled from _smoothMid/
@@ -333,8 +430,14 @@ export class Scene {
       uBeatNonBassFactor: { value: BEAT_NON_BASS_FACTOR },
       uTwinkleSpeed: { value: TWINKLE_SPEED },
       uTwinkleSizeAmount: { value: TWINKLE_SIZE_AMOUNT },
-      uColor: { value: new THREE.Color(SPHERE_COLOR) },
+      uColor: { value: new THREE.Color(DEFAULT_SPHERE_COLOR) },
       uOpacity: { value: POINT_OPACITY },
+      uAnchorColors: { value: REGION_COLORS_FLAT },
+      uRegionAxis: { value: REGION_SPIN_AXIS },
+      uRegionSpin: { value: 0 },
+      uRegionMix: { value: 0 },
+      uRegionSharpness: { value: REGION_SHARPNESS },
+      uRegionBackFade: { value: REGION_BACK_FADE },
     };
 
     const material = new THREE.ShaderMaterial({
@@ -377,6 +480,63 @@ export class Scene {
     return this._raycaster.ray.intersectSphere(sphere, new THREE.Vector3()) !== null;
   }
 
+  /**
+   * Switches the sphere to a fixed color (a hex number, e.g. 0xaa66ff) and
+   * leaves rainbow mode. Cheap enough to call on every arrow-key press: the
+   * color is a single shader uniform, so it lands on the next render with no
+   * geometry rebuild or material recompile.
+   */
+  setColor(hex) {
+    this._regionTarget = 0;
+    this._uniforms.uColor.value.setHex(hex);
+  }
+
+  /**
+   * Rainbow mode: hand each region its own hue and rotate the whole color
+   * field around the sphere (see REGION_* above). update() does the stepping;
+   * the switch itself crossfades rather than snapping.
+   */
+  setRegionColors(on) {
+    this._regionTarget = on ? 1 : 0;
+  }
+
+  /**
+   * The color currently facing the camera, as '170, 102, 255' — what
+   * --box-color-rgb wants, so the now-playing box can follow along. In rainbow
+   * mode that means the box tracks whichever region has rotated to the front,
+   * which is why this mirrors the shader's blend on the CPU.
+   */
+  getColorRgbTriplet() {
+    const flat = this._uniforms.uColor.value;
+    if (this._regionMix <= 0.001) return rgbTriplet(flat.getHex());
+
+    // The point nearest the camera is +Z from the group's center in world
+    // space; undo the group's rotation to find which bit of the sphere that
+    // actually is.
+    this._frontDir ??= new THREE.Vector3();
+    this._spunAnchor ??= new THREE.Vector3();
+    this._blendedColor ??= new THREE.Color();
+    const front = this._frontDir.set(0, 0, 1).applyQuaternion(this._group.quaternion.clone().invert());
+
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let total = 0;
+    for (let i = 0; i < ANCHOR_COUNT; i++) {
+      const spun = this._spunAnchor.copy(ZONE_ANCHORS[i]).applyAxisAngle(REGION_SPIN_AXIS, this._regionSpin);
+      const w = Math.exp(REGION_SHARPNESS * (front.dot(spun) - 1));
+      r += w * REGION_COLORS[i].r;
+      g += w * REGION_COLORS[i].g;
+      b += w * REGION_COLORS[i].b;
+      total += w;
+    }
+    const safe = Math.max(total, 0.0001);
+    const blended = this._blendedColor.setRGB(r / safe, g / safe, b / safe);
+    // Match the shader's crossfade so the box and the sphere stay in step.
+    blended.lerpColors(flat, blended, this._regionMix);
+    return rgbTriplet(blended.getHex());
+  }
+
   /** Instant visual "hit" feedback (same kick a beat gives), independent of how long an async action triggered by it takes. */
   pulse() {
     this._punch = 1;
@@ -414,6 +574,12 @@ export class Scene {
 
     this.camera.fov = this._baseFov - this._punch * CAMERA_FOV_PUNCH;
     this.camera.updateProjectionMatrix();
+
+    // Rainbow mode: keep the color field turning, and ease in/out of it.
+    this._regionSpin = (this._regionSpin + (dt * Math.PI * 2) / REGION_SPIN_SECONDS) % (Math.PI * 2);
+    this._regionMix = THREE.MathUtils.lerp(this._regionMix, this._regionTarget, REGION_FADE_SMOOTHING);
+    this._uniforms.uRegionSpin.value = this._regionSpin;
+    this._uniforms.uRegionMix.value = this._regionMix;
 
     this._uniforms.uBass.value = this._targetBass;
     this._uniforms.uMid.value = this._targetMid;

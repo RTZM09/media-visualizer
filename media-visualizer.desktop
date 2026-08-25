@@ -5,8 +5,8 @@
 Type=Application
 Name=Media Visualizer
 Comment=Audio-reactive particle sphere visualizer
-Exec=/home/matei/Documents/proiecte_personale/player_spotify/launch.sh
-Icon=/home/matei/Documents/proiecte_personale/player_spotify/assets/icon.png
+Exec=/home/matei/Documents/proiecte_personale/media_visualiser/launch.sh
+Icon=/home/matei/Documents/proiecte_personale/media_visualiser/assets/icon.png
 Terminal=false
 Categories=AudioVideo;Music;
 StartupNotify=true

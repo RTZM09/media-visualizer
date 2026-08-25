@@ -5,44 +5,27 @@
   <title>Media Visualizer by RTZ</title>
   <style>
     :root {
-      /* Preset colors, as R,G,B triplets (so they drop straight into
-         rgba()) — matches the COLOR_* palette in src/scene.js. Pick one
-         for --box-color-rgb below, or add your own. */
-      --color-red: 255, 43, 68;
-      --color-pink: 255, 102, 136;
-      --color-cyan: 102, 238, 255;
-      --color-purple: 170, 102, 255;
-      --color-green: 90, 255, 160;
-      --color-orange: 255, 157, 77;
-      --color-gold: 255, 209, 102;
-
-      --box-color-rgb: var(--color-purple); /* <- change to any --color-* preset above */
+      /* The palette itself now lives in src/palette.js — one list shared by
+         the sphere and this box, so there's nothing to keep in sync by hand.
+         The value below is just the pre-JS default (purple); src/color-menu.js
+         overwrites it as soon as the saved color loads, and again every time
+         you pick a new one with `s`. */
+      --box-color-rgb: 170, 102, 255;
     }
 
     html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-    /* #scene covers the entire viewport and is where sphere clicks are
-       handled in JS — it must NOT be a drag region, or Chromium intercepts
-       mousedown to move the window natively and the click never reaches
-       our listener at all. A small dedicated strip below is the drag
-       handle instead (frameless window — see electron/main.cjs). */
-    #scene { position: fixed; inset: 0; -webkit-app-region: no-drag; }
+    /* The window is dragged from anywhere on it, tracked in JS rather than
+       with a `-webkit-app-region: drag` region — a native region swallows
+       mousedown, which would break click-the-sphere-to-play/pause. See
+       src/window-drag.js. user-select stops a drag across the now-playing
+       text from selecting it. */
+    body { user-select: none; -webkit-user-select: none; }
+    #scene { position: fixed; inset: 0; }
     canvas { display: block; }
 
-    #drag-handle {
-      position: fixed; top: 0; left: 0; right: 32px; height: 22px; z-index: 5;
-      -webkit-app-region: drag;
-    }
-
-    #close-btn {
-      position: fixed; top: 8px; right: 8px; z-index: 20;
-      width: 22px; height: 22px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(20, 10, 14, 0.5); color: #fff; border: none;
-      font: 14px/1 system-ui, sans-serif; cursor: pointer;
-      opacity: 0.5; transition: opacity 0.2s ease, background 0.2s ease;
-      -webkit-app-region: no-drag;
-    }
-    #close-btn:hover { opacity: 1; background: rgba(255, 43, 68, 0.75); }
+    /* Whole-window feedback while a drag is in flight, overriding the
+       per-element cursors underneath it. */
+    body.dragging, body.dragging * { cursor: grabbing !important; }
 
     /* Echoes the sphere's look: same pink dots, but with no defined edge —
        the dot field itself thins out and dims into the dark, standing in
@@ -86,17 +69,56 @@
       font: clamp(10px, 1.2vw, 12px)/1 system-ui, sans-serif;
       display: flex; align-items: center; justify-content: center;
       pointer-events: auto;
-      -webkit-app-region: no-drag;
       transition: background 0.15s ease;
     }
     .np-btn:hover { background: rgba(var(--box-color-rgb), 0.4); }
+
+    /* Color picker (press `s`). Sits top-center, clear of the drag handle
+       above it and the now-playing box below, and borrows the same dot-field
+       halo as that box so it reads as part of the same app. */
+    #color-menu {
+      position: fixed; top: clamp(30px, 7vw, 44px); left: 50%; transform: translateX(-50%);
+      z-index: 15;
+      /* width: max-content is load-bearing — `left: 50%` leaves only half the
+         viewport as available width, so a shrink-to-fit box would wrap the row
+         at half the space it actually has. max-width still lets it wrap on a
+         genuinely narrow window. */
+      width: max-content; max-width: 88vw;
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+      gap: clamp(5px, 1.2vw, 10px);
+      padding: clamp(7px, 1.4vw, 13px) clamp(10px, 2vw, 18px);
+      opacity: 0; transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    #color-menu.visible { opacity: 1; }
+    #color-menu::before {
+      content: '';
+      position: absolute;
+      inset: clamp(-24px, -5vw, -48px);
+      background-image: radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
+      background-size: 4px 4px;
+      -webkit-mask-image: radial-gradient(ellipse at center, black 18%, transparent 70%);
+      mask-image: radial-gradient(ellipse at center, black 18%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+    /* The swatches are the only part that takes clicks — the container stays
+       transparent to them so the sphere behind it is still clickable. */
+    .swatch {
+      flex: none; width: clamp(15px, 2.2vw, 22px); height: clamp(15px, 2.2vw, 22px);
+      border-radius: 50%; border: none; padding: 0; cursor: pointer;
+      pointer-events: auto;
+      opacity: 0.65;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .swatch:hover { opacity: 1; transform: scale(1.15); }
+    .swatch.active { opacity: 1; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9); }
   </style>
 </head>
 <body>
   <div id="scene"></div>
 
-  <div id="drag-handle"></div>
-  <button id="close-btn" aria-label="Close">&times;</button>
+  <div id="color-menu" aria-hidden="true"></div>
 
   <div id="now-playing">
     <button id="np-prev" class="np-btn" aria-label="Previous track">&#9664;</button>

@@ -1,10 +1,38 @@
 import { AudioEngine } from './audio.js';
 import { Scene } from './scene.js';
+import { createColorMenu } from './color-menu.js';
+import { DEFAULT_KEY } from './palette.js';
+import { initWindowDrag } from './window-drag.js';
 
 const container = document.getElementById('scene');
 
 const audio = new AudioEngine();
 const scene = new Scene(container);
+
+// Drag the window from anywhere on it, not just a strip at the top.
+const windowDrag = initWindowDrag();
+
+// --- Color (press `s`) ---
+// The menu recolors the sphere and the now-playing box together; the pick is
+// persisted through the main process (see electron/settings.cjs).
+const colorMenu = createColorMenu({
+  scene,
+  onChange: (key) => window.settingsBridge?.setColor(key),
+  onPaint: () => syncBoxColorToSphere(),
+});
+
+// Restore the saved color. Async, so the very first frames may show the
+// default before it lands — not noticeable, and it falls back cleanly when
+// the bridge isn't there (e.g. the page opened outside Electron).
+(async () => {
+  let saved;
+  try {
+    saved = await window.settingsBridge?.get();
+  } catch {
+    saved = null;
+  }
+  colorMenu.select(saved?.colorKey ?? DEFAULT_KEY, { persist: false });
+})();
 
 // --- Now playing (see electron/now-playing.cjs) ---
 const nowPlayingEl = document.getElementById('now-playing');
@@ -12,7 +40,6 @@ const npTitleEl = document.getElementById('np-title');
 const npArtistEl = document.getElementById('np-artist');
 const npPrevBtn = document.getElementById('np-prev');
 const npNextBtn = document.getElementById('np-next');
-const closeBtn = document.getElementById('close-btn');
 
 let hasTrack = false;
 let boxHiddenByUser = false;
@@ -33,7 +60,6 @@ window.nowPlayingBridge?.onUpdate((info) => {
 
 npPrevBtn.addEventListener('click', () => window.nowPlayingBridge?.previousTrack());
 npNextBtn.addEventListener('click', () => window.nowPlayingBridge?.nextTrack());
-closeBtn.addEventListener('click', () => window.close());
 
 // --- Click the sphere to play/pause whatever's playing ---
 // The visual pulse fires immediately on click, independent of the actual
@@ -46,6 +72,7 @@ container.addEventListener('click', (e) => {
 });
 
 container.addEventListener('mousemove', (e) => {
+  if (windowDrag.isDragging()) return; // the drag cursor wins while a drag is in flight
   container.style.cursor = scene.hitTestSphere(e.clientX, e.clientY) ? 'pointer' : 'default';
 });
 
@@ -57,14 +84,36 @@ function updateSphereFraming() {
   scene.setVerticalTarget(targetY);
 }
 
+// The now-playing box's halo and buttons track the sphere's color (index.html
+// draws them from --box-color-rgb). Called both on pick (so it lands even if
+// frames are throttled) and every frame (so rainbow mode drags the box along),
+// but only writes when the value actually changes — a fixed color costs one
+// style write, not one per frame.
+let lastBoxTriplet = null;
+function syncBoxColorToSphere() {
+  const triplet = scene.getColorRgbTriplet();
+  if (triplet === lastBoxTriplet) return;
+  lastBoxTriplet = triplet;
+  document.documentElement.style.setProperty('--box-color-rgb', triplet);
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const features = audio.update();
   updateSphereFraming();
   scene.update(features);
+  syncBoxColorToSphere();
 }
 
 window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  // The menu gets first refusal on arrows/Enter/Escape/digits while it's open.
+  if (colorMenu.handleKey(e)) {
+    e.preventDefault();
+    return;
+  }
+
   if (e.key === 'F11') {
     document.fullscreenElement
       ? document.exitFullscreen()
@@ -72,6 +121,8 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'f' || e.key === 'F') {
     boxHiddenByUser = !boxHiddenByUser;
     updateNowPlayingVisibility();
+  } else if (e.key === 's' || e.key === 'S') {
+    colorMenu.toggle();
   }
 });
 

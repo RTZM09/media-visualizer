@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { AudioCapture } = require('./audio-capture.cjs');
 const { getCurrentTrack, togglePlayPause, nextTrack, previousTrack } = require('./now-playing.cjs');
+const { readSettings, writeSettings } = require('./settings.cjs');
+const { registerWindowDragHandlers } = require('./window-drag.cjs');
 
 const isDev = process.env.NODE_ENV === 'development';
 const NOW_PLAYING_POLL_MS = 1000;
@@ -102,6 +104,12 @@ ipcMain.handle('previous-track', async () => {
     return false;
   }
 });
+
+registerWindowDragHandlers();
+
+ipcMain.handle('get-settings', () => readSettings());
+
+ipcMain.handle('set-color', (_event, colorKey) => writeSettings({ colorKey }));
 
 app.whenReady().then(createWindow);
 

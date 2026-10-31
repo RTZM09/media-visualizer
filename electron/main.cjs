@@ -55,9 +55,14 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  capture = new AudioCapture((features) => {
-    if (!win.isDestroyed()) win.webContents.send('audio-features', features);
-  });
+  // The main process owns the saved instrumental-only mode, so capture starts
+  // in the right mode instead of flashing the full mix while the renderer loads.
+  capture = new AudioCapture(
+    (features) => {
+      if (!win.isDestroyed()) win.webContents.send('audio-features', features);
+    },
+    { instrumentalOnly: !!readSettings().instrumentalOnly },
+  );
   win.webContents.once('did-finish-load', () => capture.start());
 
   if (nowPlayingTimer) clearInterval(nowPlayingTimer);
@@ -110,6 +115,12 @@ registerWindowDragHandlers();
 ipcMain.handle('get-settings', () => readSettings());
 
 ipcMain.handle('set-color', (_event, colorKey) => writeSettings({ colorKey }));
+
+ipcMain.handle('set-instrumental', (_event, on) => {
+  const instrumentalOnly = !!on;
+  if (capture) capture.setInstrumentalOnly(instrumentalOnly);
+  return writeSettings({ instrumentalOnly });
+});
 
 app.whenReady().then(createWindow);
 

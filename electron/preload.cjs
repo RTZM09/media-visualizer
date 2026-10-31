@@ -15,10 +15,11 @@ contextBridge.exposeInMainWorld('nowPlayingBridge', {
   previousTrack: () => ipcRenderer.invoke('previous-track'),
 });
 
-// Persisted preferences (currently just the color picked with `s`).
+// Persisted preferences: the color picked with `s` and instrumental-only mode (`v`).
 contextBridge.exposeInMainWorld('settingsBridge', {
   get: () => ipcRenderer.invoke('get-settings'),
   setColor: (colorKey) => ipcRenderer.invoke('set-color', colorKey),
+  setInstrumental: (on) => ipcRenderer.invoke('set-instrumental', on),
 });
 
 // Window dragging from anywhere on the app (see src/window-drag.js).

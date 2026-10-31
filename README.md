@@ -57,6 +57,7 @@ ln -sf "$(pwd)/media-visualizer.desktop" ~/.local/share/applications/
 | **Click the sphere** | Play / pause |
 | **`s`** | Open the colour menu |
 | **`f`** | Show / hide the now-playing box |
+| **`v`** | Instrumental only: ignore the vocals (toggle) |
 | **`F11`** | Fullscreen |
 | **◀ ▶** | Previous / next track |
 | **`Alt`+`F4`** | Quit — there is no close button |
@@ -73,7 +74,8 @@ and friends stay free.
 Eight options: seven flat presets (red, pink, cyan, purple, green, orange, gold)
 and **rainbow**. Whatever you pick recolours the sphere *and* the now-playing
 box together, and is remembered across restarts in
-`~/.config/spotify-constellation-visualizer/settings.json`.
+`~/.config/spotify-constellation-visualizer/settings.json` (instrumental-only
+mode is saved there too).
 
 Rainbow is not a single cycling hue. The sphere is divided into 12 regions —
 the same anchors that drive the audio bumps — each gets its own hue, and the
@@ -95,7 +97,7 @@ values through the `--box-color-rgb` custom property.
 |---|---|
 | `main.cjs` | Creates the 300×300 frameless/transparent window, pins it above other windows, polls now-playing once a second |
 | `audio-capture.cjs` | Spawns `pw-record` against the default sink's monitor and extracts audio features in-process |
-| `dsp.cjs` | FFT and Hann window |
+| `dsp.cjs` | FFT, Hann window, and the centre-channel mask for instrumental mode |
 | `now-playing.cjs` | Reads MPRIS over D-Bus; cleans up track titles; best-effort ad detection |
 | `settings.cjs` | JSON settings file in the app's `userData` dir |
 | `window-drag.cjs` | Applies drag deltas to the window position |
@@ -124,6 +126,28 @@ The capture also computes an overall `level` and 48 log-spaced bands
 (40 Hz–14 kHz) and ships them to the renderer, but the current scene only
 consumes `bass`, `mid`, `treble` and `beat`. They're there for a future
 per-band effect.
+
+### Instrumental mode (`v`)
+
+Press `v` to make the sphere react to the instrumental ("the negative") and
+mostly ignore the vocals. There is no AI model and no extra latency. Instead it
+uses the fact that lead vocals are almost always mixed dead centre, while most
+instruments have some stereo width. In this mode the left and right channels
+are FFT'd separately, and every bin where both channels agree in level and
+phase (i.e. centred sound) is turned down by 90%, but only between 150 Hz and
+6 kHz, with soft edges. Below that range nothing changes, so the kick, bass
+line and beat detection still follow the full mix. Every feature is then
+computed from that filtered spectrum, and the auto-gains are reset on each
+switch so the levels re-settle at once.
+
+The tunables are in `VOCAL_SUPPRESSION` at the top of
+`electron/audio-capture.cjs`. The mask itself is `centerSuppressionGains` in
+`electron/dsp.cjs`.
+
+Limits of the trick: it does nothing on mono recordings, it lets through
+vocals that are panned or drenched in stereo reverb, and it also quiets
+anything else sitting centred in that range (often the snare, sometimes a lead
+synth or guitar).
 
 ### The sphere
 

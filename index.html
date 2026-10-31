@@ -113,12 +113,37 @@
     }
     .swatch:hover { opacity: 1; transform: scale(1.15); }
     .swatch.active { opacity: 1; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9); }
+
+    /* Brief "Instrumental only" / "Full mix" note when `v` is pressed. It sits
+       where the colour menu does and wears the same dot halo. */
+    #mode-toast {
+      position: fixed; top: clamp(30px, 7vw, 44px); left: 50%; transform: translateX(-50%);
+      z-index: 14; width: max-content; max-width: 88vw;
+      font: 600 clamp(11px, 1.4vw, 13px)/1.4 system-ui, sans-serif; color: #fff;
+      padding: clamp(6px, 1.2vw, 10px) clamp(12px, 2.2vw, 20px);
+      opacity: 0; transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    #mode-toast.visible { opacity: 1; }
+    #mode-toast::before {
+      content: '';
+      position: absolute;
+      inset: clamp(-18px, -4vw, -36px);
+      background-image: radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
+      background-size: 4px 4px;
+      -webkit-mask-image: radial-gradient(ellipse at center, black 18%, transparent 70%);
+      mask-image: radial-gradient(ellipse at center, black 18%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
   </style>
 </head>
 <body>
   <div id="scene"></div>
 
   <div id="color-menu" aria-hidden="true"></div>
+
+  <div id="mode-toast" aria-live="polite"></div>
 
   <div id="now-playing">
     <button id="np-prev" class="np-btn" aria-label="Previous track">&#9664;</button>

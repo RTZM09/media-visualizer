@@ -21,9 +21,12 @@ const colorMenu = createColorMenu({
   onPaint: () => syncBoxColorToSphere(),
 });
 
-// Restore the saved color. Async, so the very first frames may show the
-// default before it lands — not noticeable, and it falls back cleanly when
-// the bridge isn't there (e.g. the page opened outside Electron).
+let instrumentalOnly = false; // `v` mode, see toggleInstrumentalOnly below
+
+// Restore the saved color and instrumental-only mode. Async, so the very
+// first frames may show the default color before it lands — not noticeable,
+// and it falls back cleanly when the bridge isn't there (e.g. the page opened
+// outside Electron).
 (async () => {
   let saved;
   try {
@@ -32,7 +35,25 @@ const colorMenu = createColorMenu({
     saved = null;
   }
   colorMenu.select(saved?.colorKey ?? DEFAULT_KEY, { persist: false });
+  instrumentalOnly = !!saved?.instrumentalOnly;
 })();
+
+// --- Instrumental only (press `v`) ---
+// The vocals are filtered out in the main process (electron/audio-capture.cjs,
+// which also starts in the saved mode by itself); this side only flips the
+// switch and briefly says which mode is now on. The saved value is restored
+// alongside the color above.
+const modeToastEl = document.getElementById('mode-toast');
+let modeToastTimer = null;
+
+function toggleInstrumentalOnly() {
+  instrumentalOnly = !instrumentalOnly;
+  window.settingsBridge?.setInstrumental(instrumentalOnly);
+  modeToastEl.textContent = instrumentalOnly ? 'Instrumental only' : 'Full mix';
+  modeToastEl.classList.add('visible');
+  clearTimeout(modeToastTimer);
+  modeToastTimer = setTimeout(() => modeToastEl.classList.remove('visible'), 1200);
+}
 
 // --- Now playing (see electron/now-playing.cjs) ---
 const nowPlayingEl = document.getElementById('now-playing');
@@ -123,6 +144,8 @@ window.addEventListener('keydown', (e) => {
     updateNowPlayingVisibility();
   } else if (e.key === 's' || e.key === 'S') {
     colorMenu.toggle();
+  } else if (e.key === 'v' || e.key === 'V') {
+    toggleInstrumentalOnly();
   }
 });
 

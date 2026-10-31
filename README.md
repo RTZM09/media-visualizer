@@ -62,7 +62,7 @@ ln -sf "$(pwd)/media-visualizer.desktop" ~/.local/share/applications/
 | **◀ ▶** | Previous / next track |
 | **`Alt`+`F4`** | Quit — there is no close button |
 
-While the colour menu is open: `←` / `→` preview colours live, `1`–`8` jump
+While the colour menu is open: `←` / `→` preview colours live, `1`–`9` jump
 straight to one, `Enter` confirms, `Esc` reverts to the colour that was showing
 when you opened it.
 
@@ -71,23 +71,43 @@ and friends stay free.
 
 ## Colours
 
-Eight options: seven flat presets (red, pink, cyan, purple, green, orange, gold)
-and **rainbow**. Whatever you pick recolours the sphere *and* the now-playing
-box together, and is remembered across restarts in
-`~/.config/spotify-constellation-visualizer/settings.json` (instrumental-only
-mode is saved there too).
+Nine options, each a combination of colours rather than a single one:
 
-Rainbow is not a single cycling hue. The sphere is divided into 12 regions —
-the same anchors that drive the audio bumps — each gets its own hue, and the
-whole colour field slowly rotates around the sphere (one turn every 26s),
-independently of the sphere's own spin, so the colours drift across the dots.
-In this mode the far hemisphere is faded out; without that you would see the
-back side's regions straight through the front and the patches would read as
-confetti rather than regions.
+| # | Name | Colours |
+|---|---|---|
+| 1 | Synthwave | hot pink, rose, sunset orange, periwinkle, cyan |
+| 2 | Cyberpunk | electric cyan, magenta, violet |
+| 3 | Vaporwave | purple, lavender, teal, orchid, light pink |
+| 4 | Cyber Sunset | coral, orange, yellow, sky blue, violet |
+| 5 | Aurora | green, turquoise, blue, pink |
+| 6 | Ocean | turquoise, sea blue, steel blue, pale blue |
+| 7 | Lava | red, crimson, ember, orange |
+| 8 | Tropical | mango, orchid pink, lagoon blue, lime |
+| 9 | **Rainbow** (default) | 12 hues spread evenly around the colour wheel |
+
+The combinations are based on popular published palettes, keeping only their
+bright colours: the dots are drawn with additive blending over the desktop, so
+dark navies and near-blacks would just vanish.
+
+Whatever you pick recolours the sphere *and* the now-playing box together, and
+is remembered across restarts in
+`~/.config/spotify-constellation-visualizer/settings.json` (instrumental-only
+mode is saved there too). A pick saved by an older version (one of the old
+single colours) falls back to rainbow.
+
+The sphere is divided into 12 regions, the same anchors that drive the audio
+bumps. Each region gets one colour from the combination (dealt out in turn, so
+with four colours each one gets three patches), and the whole colour field
+slowly rotates around the sphere (one turn every 26s), independently of the
+sphere's own spin, so the colours drift across the dots. Switching combinations
+crossfades rather than snapping. The far hemisphere is faded out; without that
+you would see the back side's regions straight through the front and the
+patches would read as confetti rather than regions. The now-playing box takes
+whichever colour is facing you.
 
 `src/palette.js` is the single source of truth for the palette. Add an entry
-there and it appears in the menu automatically — the CSS side reads the same
-values through the `--box-color-rgb` custom property.
+there (three to five colours works best) and it appears in the menu
+automatically.
 
 ## How it works
 
@@ -162,8 +182,9 @@ bumps independently.
 Everything adjustable lives in the `TUNABLES` section at the top of
 `src/scene.js`: sphere size and point count, per-characteristic displacement,
 how sharp or blended the regions are, beat reaction, rotation and scale
-response, and the rainbow constants (`REGION_SPIN_SECONDS` for speed,
-`REGION_SHARPNESS` for how distinct the patches are).
+response, and the colour-field constants (`REGION_SPIN_SECONDS` for speed,
+`REGION_SHARPNESS` for how distinct the patches are, `REGION_FADE_SMOOTHING`
+for how fast a new combination fades in).
 
 ## Two things that look wrong but aren't
 

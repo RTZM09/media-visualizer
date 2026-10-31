@@ -1,7 +1,7 @@
 import { AudioEngine } from './audio.js';
 import { Scene } from './scene.js';
 import { createColorMenu } from './color-menu.js';
-import { DEFAULT_KEY } from './palette.js';
+import { COLOR_KEYS, DEFAULT_KEY } from './palette.js';
 import { initWindowDrag } from './window-drag.js';
 
 const container = document.getElementById('scene');
@@ -34,7 +34,9 @@ let instrumentalOnly = false; // `v` mode, see toggleInstrumentalOnly below
   } catch {
     saved = null;
   }
-  colorMenu.select(saved?.colorKey ?? DEFAULT_KEY, { persist: false });
+  // An unknown key (e.g. one of the old single colors) falls back to the default.
+  const savedKey = COLOR_KEYS.includes(saved?.colorKey) ? saved.colorKey : DEFAULT_KEY;
+  colorMenu.select(savedKey, { persist: false });
   instrumentalOnly = !!saved?.instrumentalOnly;
 })();
 
@@ -107,9 +109,8 @@ function updateSphereFraming() {
 
 // The now-playing box's halo and buttons track the sphere's color (index.html
 // draws them from --box-color-rgb). Called both on pick (so it lands even if
-// frames are throttled) and every frame (so rainbow mode drags the box along),
-// but only writes when the value actually changes — a fixed color costs one
-// style write, not one per frame.
+// frames are throttled) and every frame (so the box follows the color field as
+// it turns), but only writes when the value actually changes.
 let lastBoxTriplet = null;
 function syncBoxColorToSphere() {
   const triplet = scene.getColorRgbTriplet();

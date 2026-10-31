@@ -1,8 +1,8 @@
-import { COLOR_KEYS, PALETTE, RAINBOW_KEY, cssHex, hexFromKey } from './palette.js';
+import { COLOR_KEYS, PALETTE, RAINBOW_KEY, colorsFromKey, swatchCss } from './palette.js';
 
-// The `s` menu: a row of color swatches that recolors the sphere and the
-// now-playing box together. Arrow keys preview live; Escape puts back
-// whatever was showing when the menu opened.
+// The `s` menu: a row of swatches, one per color combination, that recolors
+// the sphere and the now-playing box together. Arrow keys preview live;
+// Escape puts back whatever was showing when the menu opened.
 
 const RAINBOW_SWATCH_CSS = 'conic-gradient(#ff2b44, #ff9d4d, #ffd166, #5affa0, #66eeff, #aa66ff, #ff2b44)';
 
@@ -16,7 +16,7 @@ export function createColorMenu({ scene, onChange, onPaint }) {
   const el = document.getElementById('color-menu');
 
   const entries = [
-    ...PALETTE.map((c) => ({ key: c.key, label: c.label, background: cssHex(c.hex) })),
+    ...PALETTE.map((c) => ({ key: c.key, label: c.label, background: swatchCss(c.colors) })),
     { key: RAINBOW_KEY, label: 'Rainbow', background: RAINBOW_SWATCH_CSS },
   ];
 
@@ -40,18 +40,16 @@ export function createColorMenu({ scene, onChange, onPaint }) {
   let committedKey = null; // what was on screen when the menu opened / was last confirmed
 
   /**
-   * Points the sphere at a color, then syncs the now-playing box to it
+   * Points the sphere at a color combination, then syncs the now-playing box to it
    * immediately rather than waiting for the next animation frame — frames
    * are throttled while the window is occluded, and a pick shouldn't leave
    * the box on the old color until the window is looked at again. (The
-   * per-frame sync stays too: rainbow mode needs it, and it de-dupes.)
+   * per-frame sync stays too: the box follows the color field as it turns,
+   * and it de-dupes.) The very first paint (the saved pick, at startup)
+   * snaps instead of crossfading from the default.
    */
   function paint(key) {
-    if (key === RAINBOW_KEY) {
-      scene.setRegionColors(true);
-    } else {
-      scene.setColor(hexFromKey(key));
-    }
+    scene.setPalette(colorsFromKey(key), { instant: currentKey === null });
     currentKey = key;
     for (const btn of buttons) btn.classList.toggle('active', btn.dataset.key === key);
     onPaint?.();

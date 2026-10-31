@@ -27,6 +27,10 @@ and `launch.sh` already pass the flag.
 npm install
 ```
 
+The text font (Outfit) comes from npm and is bundled into `dist/`, so the app
+needs no internet connection at runtime. After pulling an update that adds a
+dependency like this one, run `npm install` again before `npm run build`.
+
 ## Running
 
 ```bash
@@ -128,7 +132,7 @@ automatically.
 | File | Role |
 |---|---|
 | `scene.js` | The Three.js point sphere — geometry, shaders, and every look/feel tunable |
-| `main.js` | Wiring: the animation loop, keyboard handling, now-playing UI |
+| `main.js` | Wiring: the animation loop, keyboard handling, now-playing UI, font import |
 | `palette.js` | Shared colour palette |
 | `color-menu.js` | The `s` menu |
 | `window-drag.js` | Pointer tracking for window dragging |

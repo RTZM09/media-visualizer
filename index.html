@@ -20,6 +20,12 @@
        src/window-drag.js. user-select stops a drag across the now-playing
        text from selecting it. */
     body { user-select: none; -webkit-user-select: none; }
+    /* Outfit is bundled (imported in src/main.js), so no network is needed.
+       It covers Latin incl. Romanian diacritics; other scripts fall back. */
+    body {
+      font-family: 'Outfit Variable', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
     #scene { position: fixed; inset: 0; }
     canvas { display: block; }
 
@@ -33,9 +39,9 @@
        box scales down smoothly as the window shrinks, not just its max-width. */
     #now-playing {
       position: fixed; bottom: clamp(14px, 3vw, 28px); left: 50%; transform: translateX(-50%);
-      z-index: 10; max-width: 70vw;
+      z-index: 10; max-width: 86vw;
       display: flex; align-items: center; gap: clamp(6px, 1.4vw, 14px);
-      font: clamp(11px, 1.3vw, 13px)/1.4 system-ui, sans-serif; color: #cfe8ff;
+      font-size: clamp(11px, 1.3vw, 13px); line-height: 1.35; color: #fff;
       padding: clamp(8px, 1.6vw, 16px) clamp(14px, 2.6vw, 28px);
       opacity: 0; transition: opacity 0.4s ease;
       pointer-events: none;
@@ -45,19 +51,33 @@
       content: '';
       position: absolute;
       inset: clamp(-30px, -6vw, -60px); /* extends well past the text so the dots have room to fade out into space */
-      background-image: radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
-      background-size: 4px 4px;
+      /* Two layers: a soft dark scrim on top that dims the dots right behind
+         the words (so the text doesn't sit on a busy grid), over the dots. */
+      background-image:
+        radial-gradient(ellipse at center, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.5) 35%, transparent 62%),
+        radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
+      background-size: 100% 100%, 4px 4px;
       -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
       mask-image: radial-gradient(ellipse at center, black 20%, transparent 72%);
       pointer-events: none;
       z-index: -1;
     }
-    #np-text { text-align: center; min-width: 0; flex: 1; }
+    #np-text {
+      text-align: center; min-width: 0; flex: 1;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 0, 0, 0.35);
+    }
     #np-title {
-      font-size: clamp(12px, 1.5vw, 14px); font-weight: 600; color: #fff;
+      font-size: clamp(14px, 1.9vw, 17px); font-weight: 600; letter-spacing: 0.01em; color: #fff;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    #np-artist { font-size: clamp(10px, 1.2vw, 12px); color: #fff; margin-top: 2px; }
+    /* Small, spaced-out capitals, a step dimmer than the title, so the two
+       lines read as clearly different things at a glance. */
+    #np-artist {
+      font-size: clamp(9.5px, 1.1vw, 11px); font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: rgba(255, 255, 255, 0.7); margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     /* Ad mode: no artist line, so the title alone sits centered in the box
        (the box's padding is symmetric top/bottom). */
     #now-playing.ad #np-artist { display: none; }
@@ -66,7 +86,7 @@
       flex: none; width: clamp(20px, 2.6vw, 26px); height: clamp(20px, 2.6vw, 26px);
       border-radius: 50%; border: none; cursor: pointer;
       background: rgba(var(--box-color-rgb), 0.18); color: #fff;
-      font: clamp(10px, 1.2vw, 12px)/1 system-ui, sans-serif;
+      font-size: clamp(10px, 1.2vw, 12px); line-height: 1;
       display: flex; align-items: center; justify-content: center;
       pointer-events: auto;
       transition: background 0.15s ease;
@@ -119,7 +139,9 @@
     #mode-toast {
       position: fixed; top: clamp(30px, 7vw, 44px); left: 50%; transform: translateX(-50%);
       z-index: 14; width: max-content; max-width: 88vw;
-      font: 600 clamp(11px, 1.4vw, 13px)/1.4 system-ui, sans-serif; color: #fff;
+      font-size: clamp(10px, 1.2vw, 12px); font-weight: 600; line-height: 1.4; color: #fff;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 0, 0, 0.35);
       padding: clamp(6px, 1.2vw, 10px) clamp(12px, 2.2vw, 20px);
       opacity: 0; transition: opacity 0.25s ease;
       pointer-events: none;
@@ -129,8 +151,10 @@
       content: '';
       position: absolute;
       inset: clamp(-18px, -4vw, -36px);
-      background-image: radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
-      background-size: 4px 4px;
+      background-image:
+        radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55) 0%, transparent 60%),
+        radial-gradient(circle, rgba(var(--box-color-rgb), 0.75) 1px, transparent 1.4px);
+      background-size: 100% 100%, 4px 4px;
       -webkit-mask-image: radial-gradient(ellipse at center, black 18%, transparent 70%);
       mask-image: radial-gradient(ellipse at center, black 18%, transparent 70%);
       pointer-events: none;

@@ -1,3 +1,5 @@
+// Bundled into dist/ by Vite, so the text font works offline over file://.
+import '@fontsource-variable/outfit';
 import { AudioEngine } from './audio.js';
 import { Scene } from './scene.js';
 import { createColorMenu } from './color-menu.js';

@@ -19,6 +19,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
+    "@fontsource-variable/outfit": "5.2.8",
     "dbus-next": "^0.10.2",
     "three": "^0.170.0"
   },
